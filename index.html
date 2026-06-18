@@ -326,6 +326,31 @@ body{background:#EDEDED;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Tex
 .sort-select-right{display:flex;align-items:center;gap:8px}
 
 .results-list{padding:0 16px}
+
+/* EMPTY STATE (shown inline in the results list when filters are too restrictive) */
+.results-empty-state{display:flex;flex-direction:column;align-items:center;text-align:center;padding:60px 12px 30px}
+.results-empty-icon{margin-bottom:18px}
+.results-empty-title{font-size:21px;font-weight:700;line-height:1.3;margin-bottom:10px}
+.results-empty-sub{font-size:14px;color:var(--gray-3);line-height:1.5;margin-bottom:20px;max-width:320px}
+.results-empty-pills{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap;justify-content:center}
+.results-empty-pill{background:var(--gray-1);color:#fff;border-radius:16px;padding:8px 14px;font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:6px;cursor:pointer}
+.results-empty-pill-x{font-size:12px}
+.results-empty-remove-btn{width:100%;max-width:340px;padding:15px;background:var(--red);border:none;border-radius:26px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;font-family:inherit;margin-bottom:16px}
+.results-empty-savesearch-link{font-size:14.5px;font-weight:700;color:var(--black)}
+
+/* SIMILAR PROPERTIES NEARBY (shown below the empty state) */
+.similar-nearby-section{border-top:1px solid var(--gray-6);padding-top:20px;margin-top:8px}
+.similar-nearby-title{font-size:19px;font-weight:700;margin-bottom:6px}
+.similar-nearby-sub{font-size:13.5px;color:var(--gray-3);line-height:1.5;margin-bottom:14px}
+.similar-nearby-scroll{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+.similar-nearby-scroll::-webkit-scrollbar{display:none}
+.similar-nearby-card{position:relative;border-radius:14px;overflow:hidden;height:150px;width:230px;flex-shrink:0;background-size:cover;background-position:center;cursor:pointer}
+.similar-nearby-brand{position:absolute;top:10px;left:10px;background:rgba(0,0,0,0.55);color:#fff;font-size:11px;font-weight:700;padding:4px 9px;border-radius:6px;letter-spacing:0.3px}
+.similar-nearby-match{position:absolute;top:10px;right:10px;background:rgba(255,255,255,0.92);color:var(--black);font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:12px;display:flex;align-items:center;gap:4px}
+.similar-nearby-match-dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+.similar-nearby-info{position:absolute;bottom:0;left:0;right:0;padding:24px 12px 10px;background:linear-gradient(180deg,transparent,rgba(0,0,0,0.65))}
+.similar-nearby-price{color:#fff;font-size:15px;font-weight:700}
+.similar-nearby-loc{color:rgba(255,255,255,0.85);font-size:11.5px;margin-top:1px}
 .listing-card{border-radius:14px;overflow:hidden;margin-bottom:16px;cursor:pointer;border:1px solid var(--gray-6);background:var(--white)}
 .listing-brand-bar{padding:9px 14px;display:flex;align-items:center}
 .listing-brand-logo{font-size:14px;font-weight:800;color:#fff;letter-spacing:0.3px}
@@ -554,6 +579,7 @@ body{background:#EDEDED;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Tex
       <div class="flow-step"><div class="flow-num">6</div><div class="flow-t">On results, tap × on a pill to remove a filter</div></div>
       <div class="flow-step"><div class="flow-num">7</div><div class="flow-t">Tap the <strong>heart icon</strong> on a listing to save it — this triggers the "Looking for more space?" modal. Tap <strong>"Apply refinement"</strong> or <strong>"Not now"</strong></div></div>
       <div class="flow-step"><div class="flow-num">8</div><div class="flow-t">If you tapped <strong>"Not now"</strong>, reopen the search filters — a <strong>"Based on your activity"</strong> card appears, letting you review the suggestion again</div></div>
+      <div class="flow-step"><div class="flow-num">9</div><div class="flow-t">Check <strong>Parking & Garage</strong> and set a max price of <strong>€20k or less</strong>, then tap "Show Results" to see the <strong>empty state</strong> — remove the restrictive filters via the button or by tapping the pills</div></div>
     </div>
   </div>
 
@@ -1626,10 +1652,18 @@ function toggleCb(row, key){
   recalc();
 }
 
+function isFilterComboTooRestrictive(){
+  const priceMaxEl = document.getElementById('price-max');
+  const priceMaxVal = priceMaxEl ? parseInt(priceMaxEl.value.replace(/\D/g,''), 10) : NaN;
+  return !!state.filters.parking && !isNaN(priceMaxVal) && priceMaxVal <= 20000;
+}
+
 function recalc(){
   let count = state.location ? (LOCATIONS[state.location]?.count || BASE_COUNT) : BASE_COUNT;
   const activeFilters = Object.values(state.filters).filter(v=>v).length;
-  if(state.location){
+  if(isFilterComboTooRestrictive()){
+    count = 0;
+  } else if(state.location){
     count = Math.max(8, count - activeFilters * 15);
   } else {
     count = Math.max(50, count - activeFilters * 90);
@@ -1818,7 +1852,7 @@ function buildResults(){
 
   let count = state.location ? (LOCATIONS[state.location]?.count || 125) : 125;
   const activeCount = Object.values(state.filters).filter(v=>v).length;
-  count = Math.max(8, count - activeCount * 18);
+  count = isFilterComboTooRestrictive() ? 0 : Math.max(8, count - activeCount * 18);
   document.getElementById('res-count').textContent = count + ' results';
 
   renderListings();
@@ -1877,6 +1911,23 @@ function togglePill(key, evt){
   buildResults();
 }
 
+function removeRestrictiveFilter(which){
+  if(which === 'parking'){
+    state.filters.parking = false;
+  } else if(which === 'price'){
+    const priceMaxEl = document.getElementById('price-max');
+    if(priceMaxEl) priceMaxEl.value = '';
+  }
+  buildResults();
+}
+
+function removeAllRestrictiveFilters(){
+  state.filters.parking = false;
+  const priceMaxEl = document.getElementById('price-max');
+  if(priceMaxEl) priceMaxEl.value = '';
+  buildResults();
+}
+
 const SAMPLE_LISTINGS = [
   { img:IMG_BALCONY, brand:'IMMO', brandLogo:'IMMO<br><span style="font-size:8px;font-weight:600">Normandie Forces</span>', brandColor:'#E8580C', match:90, price:'174,500', ppm:'€2,327 / m²', type:'Apartment for sale', meta:'3 rooms · 2 beds · 75 m² · LG', loc:'Bas Venoix et Prairie, Caen (14000)', dpe:'A+', dpeColor:'#27AE60', agency:'Immo de France Normandie', exclusive:false, tags:{parking:true,balcony:true,garden:false,pool:false,cellar:true,furnished:false,unfurnished:true,kitchen:true,renovate:false,access:false,elevator:true}, pages:'1/5' },
   { img:IMG_LIVINGROOM_TV, brand:'Orpi', brandLogo:'Orpi', brandColor:'#E8192C', match:60, price:'248,000', ppm:'€4,133 / m²', type:'Apartment for sale', meta:'3 rooms · 2 beds · 60 m² · floor 4/4', loc:'Saint Thérèse-Demi-Lune, Caen (14000)', dpe:'D', dpeColor:'#F5CF00', dpeText:'#333', agency:'Orpi Caen MDG', exclusive:true, tags:{parking:true,balcony:false,garden:false,pool:false,cellar:true,furnished:false,unfurnished:false,kitchen:false,renovate:false,access:false,elevator:true}, pages:'1/15' },
@@ -1909,6 +1960,50 @@ const CRITERIA_LABELS = {
 
 function renderListings(){
   const list = document.getElementById('results-list');
+
+  // Trigger condition for the "no results" empty state: Parking & Garage checked
+  // together with a max price of €20k or less — deliberately restrictive, matching
+  // the reference screenshot, so this state can be reliably tested from the form.
+  const priceMaxEl = document.getElementById('price-max');
+  const priceMaxVal = priceMaxEl ? parseInt(priceMaxEl.value.replace(/\D/g,''), 10) : NaN;
+  const isTooRestrictive = isFilterComboTooRestrictive();
+
+  if(isTooRestrictive){
+    list.innerHTML = `
+      <div class="results-empty-state">
+        <div class="results-empty-icon">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 10.5L12 4L21 10.5V19.5C21 20.0523 20.5523 20.5 20 20.5H4C3.44772 20.5 3 20.0523 3 19.5V10.5Z" stroke="#646464" stroke-width="1.4" stroke-linejoin="round"/><path d="M9.5 20.5V14.5H14.5V20.5" stroke="#646464" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="results-empty-title">No properties match your criteria.</div>
+        <div class="results-empty-sub">Some of your filters may be limiting your results. Remove them to discover more opportunities.</div>
+        <div class="results-empty-pills">
+          <div class="results-empty-pill" onclick="removeRestrictiveFilter('parking')">Parking &amp; Gar... <span class="results-empty-pill-x">✕</span></div>
+          <div class="results-empty-pill" onclick="removeRestrictiveFilter('price')">≤ €${Math.round(priceMaxVal/1000)}k <span class="results-empty-pill-x">✕</span></div>
+        </div>
+        <button class="results-empty-remove-btn" onclick="removeAllRestrictiveFilters()">Remove restrictive filters</button>
+        <div class="results-empty-savesearch-link">🔔 Save search</div>
+      </div>
+
+      <div class="similar-nearby-section">
+        <div class="similar-nearby-title">Similar properties nearby</div>
+        <div class="similar-nearby-sub">${state.location ? (LOCATIONS[state.location]?.nearby || 22) : 22} properties near ${state.location || 'you'} match most of your criteria.</div>
+        <div class="similar-nearby-scroll">
+          ${[6,5,0].map(idx=>{
+            const l = SAMPLE_LISTINGS[idx];
+            return `
+            <div class="similar-nearby-card" style="background-image:url('${l.img}')" onclick="openDetail(${idx})">
+              ${l.brand ? `<div class="similar-nearby-brand">${l.brand}</div>` : ''}
+              <div class="similar-nearby-match"><span class="similar-nearby-match-dot"></span>${l.match}% match</div>
+              <div class="similar-nearby-info">
+                <div class="similar-nearby-price">€${l.price}</div>
+                <div class="similar-nearby-loc">${l.loc.split(',')[0]}</div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    return;
+  }
 
   // Keep a visible mix of high- and low-match listings rather than hard-filtering
   // out everything that doesn't match every checked criterion — this lets the
